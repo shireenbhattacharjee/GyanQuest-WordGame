@@ -1,28 +1,399 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>GyanQuest Word Game</title>
-    <meta name="description" content="An academic word quest extracting 5-letter words and contextual clues from PDFs using pdf.js, featuring 6-attempt sequential gameplay and progress tracking." />
-    <meta property="og:title" content="GyanQuest Word Game" />
-    <meta property="og:description" content="An academic word quest extracting 5-letter words and contextual clues from PDFs using pdf.js, featuring 6-attempt sequential gameplay and progress tracking." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
-    <!-- pdf.js CDN for client-side PDF text extraction -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script>
-      // Configure PDF.js worker
-      if (window.pdfjsLib) {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GyanQuest Word Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    :root {
+      --bg: #FBF9F5;
+      --card-bg: #FFFFFF;
+      --border: #E7E5E4;
+      --primary: #B45309;
+      --primary-hover: #92400E;
+      --correct: #059669;
+      --present: #D97706;
+      --absent: #78716C;
+      --text: #1C1917;
+      --text-muted: #78716C;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 3rem 1rem;
+    }
+    header { text-align: center; margin-bottom: 1.5rem; }
+    h1 { font-family: 'Cinzel', Georgia, serif; font-size: 2.25rem; color: #1C1917; letter-spacing: 0.05em; }
+    .subtitle { color: var(--text-muted); font-size: 0.95rem; margin-top: 0.25rem; }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1.25rem;
+      padding: 1.75rem;
+      width: 100%;
+      max-width: 600px;
+      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.04);
+      text-align: center;
+    }
+    .meta-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+    .badge {
+      background: #FEF3C7;
+      color: #92400E;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-weight: 700;
+    }
+    .progress-bar {
+      height: 6px;
+      background: #E7E5E4;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+    .progress-fill { height: 100%; background: var(--primary); transition: width 0.3s; }
+    .clue-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--primary);
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+    .clue-box {
+      background: #F5F5F4;
+      border-left: 4px solid var(--primary);
+      padding: 1.25rem 1.5rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1.25rem;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 1.2rem;
+      font-style: italic;
+      color: #1C1917;
+      line-height: 1.6;
+    }
+    .clue-blank {
+      color: var(--primary);
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      font-family: monospace;
+      font-style: normal;
+      background: #FEF3C7;
+      padding: 0 4px;
+      border-radius: 4px;
+    }
+    .chances-row {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 1.25rem;
+    }
+    .chance-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #F59E0B;
+    }
+    .chance-dot.used { background: #D6D3D1; }
+    .attempts-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin: 0 auto 1.5rem auto;
+      max-width: 290px;
+    }
+    .attempt-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .tile {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: monospace;
+      font-size: 1.5rem;
+      font-weight: 700;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      text-transform: uppercase;
+      background: white;
+      transition: all 0.2s;
+    }
+    .tile.typing { border-color: var(--primary); transform: scale(1.04); }
+    .tile.correct { background: var(--correct); color: white; border-color: var(--correct); }
+    .tile.present { background: var(--present); color: white; border-color: var(--present); }
+    .tile.absent { background: var(--absent); color: white; border-color: var(--absent); }
+    .input-control {
+      margin: 1rem 0;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+    }
+    .text-input {
+      font-size: 1.2rem;
+      padding: 0.65rem 1rem;
+      text-align: center;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      font-weight: 700;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      width: 180px;
+      outline: none;
+      font-family: monospace;
+    }
+    .text-input:focus { border-color: var(--primary); }
+    .btn {
+      padding: 0.65rem 1.4rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-next { background: var(--correct); color: white; width: 100%; font-size: 1.1rem; padding: 0.85rem; }
+    .btn-next:hover { background: #047857; }
+    .upload-zone {
+      margin-top: 1.5rem;
+      border: 2px dashed #D6D3D1;
+      padding: 1.25rem;
+      border-radius: 12px;
+      background: #FAFAF9;
+      cursor: pointer;
+      transition: border 0.2s;
+    }
+    .upload-zone:hover { border-color: var(--primary); background: #FEF3C7; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GyanQuest</h1>
+    <p class="subtitle">Academic Word Quest with Contextual PDF Clues</p>
+  </header>
+
+  <div class="card">
+    <div class="meta-bar">
+      <span class="badge" id="progressText">Word 1 of 5</span>
+      <span id="scoreText">Score: 0</span>
+      <span id="chancesText">6 Chances Left</span>
+    </div>
+
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width: 20%;"></div>
+    </div>
+
+    <div class="clue-label">The Gyan Clue</div>
+    <div class="clue-box">
+      <p id="clueContent">"The ______ system moves across the sky."</p>
+    </div>
+
+    <div class="chances-row" id="chancesDots"></div>
+    <div class="attempts-grid" id="attemptsGrid"></div>
+
+    <!-- Active Single-Question Input -->
+    <div id="activeControls">
+      <div class="input-control">
+        <input type="text" id="guessInput" class="text-input" maxlength="5" placeholder="GUESS" autofocus>
+        <button id="submitBtn" class="btn btn-primary">Submit</button>
+      </div>
+      <p style="font-size: 0.75rem; color: #78716C;">Press Enter or click Submit</p>
+    </div>
+
+    <!-- Strict Sequential Transition Button -->
+    <div id="solutionBox" style="display: none; margin-top: 1.25rem;">
+      <p id="solutionMsg" style="font-weight: 700; margin-bottom: 0.75rem; font-size: 1.1rem;"></p>
+      <button id="nextLevelBtn" class="btn btn-next">Next Level ➔</button>
+    </div>
+
+    <!-- PDF Upload Trigger -->
+    <div class="upload-zone" onclick="document.getElementById('pdfInput').click()">
+      <p style="font-weight: 700; font-size: 0.95rem; color: #44403C;">Upload Any PDF to Build a Custom Quest</p>
+      <p style="font-size: 0.8rem; color: #78716C; margin-top: 4px;">pdf.js parses the document and extracts 5-letter words with original sentence blanks.</p>
+      <input type="file" id="pdfInput" accept=".pdf" style="display: none;">
+    </div>
+  </div>
+
+  <script>
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    let questWords = [
+      { word: "SOLAR", clue: "The ______ system moves in silent harmony across the sky." },
+      { word: "ORBIT", clue: "Every planet casts a faint shadow into the deep ______ of space." },
+      { word: "LIGHT", clue: "A radiant ______ shines through the misty cloud above the realm." },
+      { word: "EARTH", clue: "The heavy stone fell towards the ______ according to natural law." },
+      { word: "STARS", clue: "Ancient scholars watched the ______ bring knowledge to seekers." }
+    ];
+
+    let currentIndex = 0;
+    let attempts = [];
+    let score = 0;
+
+    function renderBoard() {
+      const current = questWords[currentIndex];
+      document.getElementById('progressText').innerText = 'Word ' + (currentIndex + 1) + ' of ' + questWords.length;
+      document.getElementById('scoreText').innerText = 'Score: ' + score;
+      document.getElementById('chancesText').innerText = (6 - attempts.length) + ' Chances Left';
+      document.getElementById('progressFill').style.width = (((currentIndex + 1) / questWords.length) * 100) + '%';
+      document.getElementById('clueContent').innerHTML = '"' + current.clue.replace(/______/g, '<span class="clue-blank">______</span>') + '"';
+
+      const dotsContainer = document.getElementById('chancesDots');
+      dotsContainer.innerHTML = '';
+      for (let i = 0; i < 6; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'chance-dot' + (i < attempts.length ? ' used' : '');
+        dotsContainer.appendChild(dot);
       }
-    </script>
-  </head>
-  <body class="bg-[#FBF9F5] text-stone-800 antialiased min-h-screen selection:bg-amber-200 selection:text-amber-900">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+      const grid = document.getElementById('attemptsGrid');
+      grid.innerHTML = '';
+      const inputVal = document.getElementById('guessInput').value.toUpperCase();
+
+      for (let r = 0; r < 6; r++) {
+        const row = document.createElement('div');
+        row.className = 'attempt-row';
+        const att = attempts[r];
+        const isCurrentTypingRow = (r === attempts.length);
+
+        for (let c = 0; c < 5; c++) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          if (att) {
+            tile.innerText = att.guess[c];
+            tile.classList.add(att.statuses[c]);
+          } else if (isCurrentTypingRow && inputVal[c]) {
+            tile.innerText = inputVal[c];
+            tile.classList.add('typing');
+          }
+          row.appendChild(tile);
+        }
+        grid.appendChild(row);
+      }
+    }
+
+    function checkGuess() {
+      const input = document.getElementById('guessInput');
+      const val = input.value.trim().toUpperCase();
+      if (val.length !== 5 || !/^[A-Z]{5}$/.test(val)) return;
+
+      const current = questWords[currentIndex];
+      const target = current.word;
+      const statuses = new Array(5).fill('absent');
+      const targetCounts = {};
+
+      for (let char of target) targetCounts[char] = (targetCounts[char] || 0) + 1;
+
+      for (let i = 0; i < 5; i++) {
+        if (val[i] === target[i]) {
+          statuses[i] = 'correct';
+          targetCounts[val[i]]--;
+        }
+      }
+      for (let i = 0; i < 5; i++) {
+        if (statuses[i] !== 'correct' && targetCounts[val[i]] > 0) {
+          statuses[i] = 'present';
+          targetCounts[val[i]]--;
+        }
+      }
+
+      attempts.push({ guess: val, statuses: statuses });
+      input.value = '';
+      renderBoard();
+
+      if (val === target) {
+        score += Math.max(10, (7 - attempts.length) * 20);
+        document.getElementById('scoreText').innerText = 'Score: ' + score;
+        document.getElementById('activeControls').style.display = 'none';
+        document.getElementById('solutionBox').style.display = 'block';
+        document.getElementById('solutionMsg').innerText = '✓ Solved correctly in ' + attempts.length + ' attempt(s)!';
+        document.getElementById('solutionMsg').style.color = '#059669';
+      } else if (attempts.length >= 6) {
+        document.getElementById('activeControls').style.display = 'none';
+        document.getElementById('solutionBox').style.display = 'block';
+        document.getElementById('solutionMsg').innerText = 'The word was: ' + target;
+        document.getElementById('solutionMsg').style.color = '#B45309';
+      }
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', checkGuess);
+    document.getElementById('guessInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') checkGuess();
+    });
+    document.getElementById('guessInput').addEventListener('input', renderBoard);
+
+    document.getElementById('nextLevelBtn').addEventListener('click', () => {
+      if (currentIndex < questWords.length - 1) {
+        currentIndex++;
+        attempts = [];
+        document.getElementById('activeControls').style.display = 'block';
+        document.getElementById('solutionBox').style.display = 'none';
+        renderBoard();
+        document.getElementById('guessInput').focus();
+      } else {
+        alert('Quest Complete! Final Score: ' + score);
+      }
+    });
+
+    document.getElementById('pdfInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += ' ' + content.items.map(it => it.str).join(' ');
+      }
+      const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+      const extracted = [];
+      const map = new Set();
+      for (let s of sentences) {
+        const words = s.match(/\b[a-zA-Z]{5}\b/g);
+        if (words) {
+          for (let w of words) {
+            const u = w.toUpperCase();
+            if (!map.has(u)) {
+              map.add(u);
+              extracted.push({ word: u, clue: s.replace(new RegExp('\\b' + w + '\\b', 'i'), '______').trim() });
+            }
+          }
+        }
+      }
+      if (extracted.length > 0) {
+        questWords = extracted.slice(0, 15);
+        currentIndex = 0;
+        attempts = [];
+        score = 0;
+        document.getElementById('activeControls').style.display = 'block';
+        document.getElementById('solutionBox').style.display = 'none';
+        renderBoard();
+        alert('Extracted ' + questWords.length + ' words from ' + file.name + '!');
+      } else {
+        alert('No 5-letter words with complete sentences found in this PDF.');
+      }
+    });
+
+    renderBoard();
+  </script>
+</body>
 </html>
